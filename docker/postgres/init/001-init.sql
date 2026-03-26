@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS service_heartbeat (
+  id SERIAL PRIMARY KEY,
+  source TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

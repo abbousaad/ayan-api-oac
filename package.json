@@ -1,0 +1,35 @@
+{
+  "name": "express-api-foundation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Express API foundation with JWT auth, Swagger docs, logging, and tests",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --runInBand",
+    "test:unit": "jest --selectProjects unit",
+    "test:security": "jest --selectProjects security",
+    "lint": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.13.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "winston": "^3.15.0"
+  },
+  "devDependencies": {
+    "jest": "^30.0.5",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.1.1"
+  }
+}

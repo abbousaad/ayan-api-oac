@@ -15,6 +15,7 @@ RUN mkdir -p /app/logs/http /app/logs/errors /app/logs/security && chown -R node
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY src ./src
+COPY storage ./storage
 COPY package.json ./package.json
 COPY env.example ./env.example
 

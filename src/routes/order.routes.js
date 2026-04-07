@@ -1,19 +1,38 @@
 const express = require('express');
-const { requireJwt, requireRole } = require('../auth/auth-middleware');
+const { requireJwt, requireRole, requireAnyRole } = require('../auth/auth-middleware');
 const locationsRepository = require('../repositories/user-locations-repository');
 const ordersRepository = require('../repositories/orders-repository');
+const publicOrdersRepository = require('../repositories/public-orders-repository');
 const productsRepository = require('../repositories/products-repository');
 const pricingConfigRepository = require('../repositories/order-pricing-config-repository');
 const couponsRepository = require('../repositories/coupons-repository');
+const appSettingsRepository = require('../repositories/app-settings-repository');
 const { canTransitionOrderStatus, isQuantityCompatibleWithUnit } = require('../services/order-workflow');
 const { computeOrderTotals } = require('../services/order-pricing');
+const { createOrderBuilder } = require('../services/order-builder');
 
 const router = express.Router();
+const orderBuilder = createOrderBuilder({
+  productsRepository,
+  pricingConfigRepository,
+  couponsRepository,
+  computeOrderTotals,
+  isQuantityCompatibleWithUnit
+});
 
 const buildOrderPayload = async (order) => {
   const items = await ordersRepository.getOrderItemsByOrderId(order.id);
-  return { ...order, items };
+  const currencyCode = await appSettingsRepository.getCurrencyCode();
+  return { ...order, items, currencyCode };
 };
+
+const buildPublicOrderPayload = async (order) => {
+  const items = await publicOrdersRepository.getPublicOrderItemsByOrderId(order.id);
+  const currencyCode = await appSettingsRepository.getCurrencyCode();
+  return { ...order, items, currencyCode };
+};
+
+const isValidOrderStatus = (status) => ['pending', 'onpreparation', 'ondelivery', 'paid'].includes(status);
 
 const validatePricingChanges = (changes) => {
   const numericFields = ['deliveryFee', 'serviceFeeRate', 'taxRate', 'discountRate'];
@@ -105,21 +124,9 @@ router.get('/me/orders', requireJwt, async (req, res) => {
 router.post('/orders', requireJwt, async (req, res) => {
   const { locationId, deliveryMode, scheduledAt = null, items, couponCode = null } = req.body || {};
 
-  if (!locationId || !deliveryMode || !Array.isArray(items) || items.length === 0) {
+  if (!locationId) {
     return res.status(400).json({
       error: { code: 'VALIDATION_ERROR', message: 'locationId, deliveryMode and items are required' }
-    });
-  }
-
-  if (deliveryMode !== 'instant' && deliveryMode !== 'scheduled') {
-    return res.status(422).json({
-      error: { code: 'INVALID_DELIVERY_MODE', message: 'deliveryMode must be instant or scheduled' }
-    });
-  }
-
-  if (deliveryMode === 'scheduled' && !scheduledAt) {
-    return res.status(422).json({
-      error: { code: 'INVALID_SCHEDULE', message: 'scheduledAt is required for scheduled deliveries' }
     });
   }
 
@@ -130,88 +137,24 @@ router.post('/orders', requireJwt, async (req, res) => {
     });
   }
 
-  const resolvedItems = [];
-  for (const item of items) {
-    if (!item.productId || item.quantity === undefined) {
-      return res.status(400).json({
-        error: { code: 'VALIDATION_ERROR', message: 'Each item requires productId and quantity' }
-      });
-    }
-
-    const product = await productsRepository.getProductById(item.productId);
-    if (!product) {
-      return res.status(404).json({
-        error: { code: 'PRODUCT_NOT_FOUND', message: `Product ${item.productId} not found` }
-      });
-    }
-
-    if (!isQuantityCompatibleWithUnit(product.unit, item.quantity)) {
-      return res.status(422).json({
-        error: { code: 'INVALID_QUANTITY', message: `Quantity is invalid for unit ${product.unit}` }
-      });
-    }
-
-    const quantity = Number(item.quantity);
-    const lineTotal = Number((product.price * quantity).toFixed(2));
-
-    resolvedItems.push({
-      productId: product.id,
-      productName: product.name,
-      unit: product.unit,
-      quantity,
-      unitPrice: product.price,
-      lineTotal
-    });
+  const builtOrder = await orderBuilder.buildOrderInput({ deliveryMode, scheduledAt, items, couponCode });
+  if (builtOrder.error) {
+    return res.status(builtOrder.error.status).json(builtOrder.error.body);
   }
-
-  let validCoupon = null;
-  let couponDiscountAmount = 0;
-  if (couponCode) {
-    validCoupon = await couponsRepository.getCouponByCode(couponCode);
-    const now = new Date();
-    const startsAt = validCoupon ? new Date(validCoupon.startsAt) : null;
-    const endsAt = validCoupon ? new Date(validCoupon.endsAt) : null;
-    const usageExceeded = validCoupon && validCoupon.maxUses !== null && validCoupon.usedCount >= validCoupon.maxUses;
-
-    if (
-      !validCoupon ||
-      !validCoupon.isActive ||
-      Number.isNaN(startsAt?.getTime()) ||
-      Number.isNaN(endsAt?.getTime()) ||
-      now < startsAt ||
-      now > endsAt ||
-      usageExceeded
-    ) {
-      return res.status(422).json({
-        error: { code: 'INVALID_COUPON', message: 'Coupon is invalid or unavailable' }
-      });
-    }
-
-    const subtotalPreview = resolvedItems.reduce((sum, item) => sum + item.lineTotal, 0);
-    if (validCoupon.discountType === 'percentage') {
-      couponDiscountAmount = Number((subtotalPreview * validCoupon.discountValue).toFixed(2));
-    } else {
-      couponDiscountAmount = Number(validCoupon.discountValue);
-    }
-    couponDiscountAmount = Number(Math.max(0, Math.min(subtotalPreview, couponDiscountAmount)).toFixed(2));
-  }
-
-  const pricingConfig = await pricingConfigRepository.getPricingConfig();
-  const totals = computeOrderTotals({ items: resolvedItems, pricingConfig, couponDiscountAmount });
 
   const order = await ordersRepository.createOrderWithItems({
     userId: req.user.id,
     locationId,
     deliveryMode,
     scheduledAt: deliveryMode === 'scheduled' ? scheduledAt : null,
-    items: resolvedItems,
-    totals,
-    couponId: validCoupon ? validCoupon.id : null,
-    couponCode: validCoupon ? validCoupon.code : null
+    items: builtOrder.data.items,
+    totals: builtOrder.data.totals,
+    couponId: builtOrder.data.coupon ? builtOrder.data.coupon.id : null,
+    couponCode: builtOrder.data.coupon ? builtOrder.data.coupon.code : null
   });
 
-  if (validCoupon) {
-    await couponsRepository.incrementCouponUsage(validCoupon.id);
+  if (builtOrder.data.coupon) {
+    await couponsRepository.incrementCouponUsage(builtOrder.data.coupon.id);
   }
 
   return res.status(201).json({ data: await buildOrderPayload(order) });
@@ -256,6 +199,62 @@ router.patch('/orders/:id/mark-paid', requireJwt, requireRole('livreur'), async 
   }
 
   const updated = await ordersRepository.updateOrderStatus({ orderId: order.id, status: 'paid' });
+  return res.status(200).json({ data: updated });
+});
+
+router.get('/public-orders', requireJwt, requireAnyRole(['superadmin', 'livreur']), async (req, res) => {
+  const { status } = req.query;
+
+  if (status && !isValidOrderStatus(status)) {
+    return res.status(422).json({
+      error: { code: 'VALIDATION_ERROR', message: 'status is invalid' }
+    });
+  }
+
+  const orders = await publicOrdersRepository.getPublicOrders({ status });
+  const payload = await Promise.all(orders.map(buildPublicOrderPayload));
+  return res.status(200).json({ data: payload });
+});
+
+router.patch('/public-orders/:id/confirm', requireJwt, requireRole('superadmin'), async (req, res) => {
+  const order = await publicOrdersRepository.getPublicOrderById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Public order not found' } });
+  }
+
+  if (!canTransitionOrderStatus({ currentStatus: order.status, nextStatus: 'onpreparation', actorRole: req.user.role })) {
+    return res.status(409).json({ error: { code: 'INVALID_STATUS_TRANSITION', message: 'Cannot confirm this order' } });
+  }
+
+  const updated = await publicOrdersRepository.updatePublicOrderStatus({ orderId: order.id, status: 'onpreparation' });
+  return res.status(200).json({ data: updated });
+});
+
+router.patch('/public-orders/:id/accept-delivery', requireJwt, requireRole('livreur'), async (req, res) => {
+  const order = await publicOrdersRepository.getPublicOrderById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Public order not found' } });
+  }
+
+  if (!canTransitionOrderStatus({ currentStatus: order.status, nextStatus: 'ondelivery', actorRole: req.user.role })) {
+    return res.status(409).json({ error: { code: 'INVALID_STATUS_TRANSITION', message: 'Cannot accept this order' } });
+  }
+
+  const updated = await publicOrdersRepository.updatePublicOrderStatus({ orderId: order.id, status: 'ondelivery' });
+  return res.status(200).json({ data: updated });
+});
+
+router.patch('/public-orders/:id/mark-paid', requireJwt, requireRole('livreur'), async (req, res) => {
+  const order = await publicOrdersRepository.getPublicOrderById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Public order not found' } });
+  }
+
+  if (!canTransitionOrderStatus({ currentStatus: order.status, nextStatus: 'paid', actorRole: req.user.role })) {
+    return res.status(409).json({ error: { code: 'INVALID_STATUS_TRANSITION', message: 'Cannot mark this order as paid' } });
+  }
+
+  const updated = await publicOrdersRepository.updatePublicOrderStatus({ orderId: order.id, status: 'paid' });
   return res.status(200).json({ data: updated });
 });
 

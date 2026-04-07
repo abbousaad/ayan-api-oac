@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { httpLoggerMiddleware } = require('./middleware/http-logger');
@@ -11,8 +12,10 @@ const { config } = require('./config/env');
 
 const app = express();
 app.set('trust proxy', config.trustProxy);
+const publicFilesPath = path.join(__dirname, '../storage/public');
 
 app.use(cors());
+app.use('/files', express.static(publicFilesPath));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(httpLoggerMiddleware);

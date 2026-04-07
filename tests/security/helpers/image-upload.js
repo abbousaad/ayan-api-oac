@@ -1,0 +1,8 @@
+const PNG_IMAGE_BUFFER = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9sZ1tcwAAAAASUVORK5CYII=',
+  'base64'
+);
+
+const INVALID_IMAGE_BUFFER = Buffer.from('not-a-real-image');
+
+module.exports = { PNG_IMAGE_BUFFER, INVALID_IMAGE_BUFFER };

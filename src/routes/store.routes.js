@@ -2,9 +2,12 @@ const express = require('express');
 const { requireJwt, requireRole } = require('../auth/auth-middleware');
 const storesRepository = require('../repositories/stores-repository');
 const productsRepository = require('../repositories/products-repository');
+const appSettingsRepository = require('../repositories/app-settings-repository');
+const { createImageUploadMiddleware, handleImageUpload, getUploadedImageUrl } = require('../uploads/image-upload');
 
 const router = express.Router();
 const ALLOWED_CATEGORIES = ['fruits', 'vegets', 'ham', 'fish', 'ingrediant'];
+const uploadStoreImage = createImageUploadMiddleware('stores');
 
 router.get('/stores', async (_req, res) => {
   const stores = await storesRepository.getAllStores();
@@ -27,10 +30,18 @@ router.get('/stores/:id/products', async (req, res) => {
   }
 
   const products = await productsRepository.getAllProducts({ storeId: req.params.id });
-  return res.status(200).json({ data: products });
+  const currencyCode = await appSettingsRepository.getCurrencyCode();
+  const payload = products.map((product) => ({ ...product, currencyCode }));
+  return res.status(200).json({ data: payload });
 });
 
 router.post('/stores', requireJwt, requireRole('superadmin'), async (req, res) => {
+  try {
+    await handleImageUpload(uploadStoreImage)(req, res);
+  } catch (uploadError) {
+    return res.status(uploadError.status).json(uploadError.body);
+  }
+
   const { name, category, slug } = req.body || {};
   if (!name || !category || !slug) {
     return res.status(400).json({
@@ -44,7 +55,8 @@ router.post('/stores', requireJwt, requireRole('superadmin'), async (req, res) =
     });
   }
 
-  const store = await storesRepository.createStore({ name, category, slug });
+  const imageUrl = getUploadedImageUrl('stores', req.file) || undefined;
+  const store = await storesRepository.createStore({ name, category, slug, imageUrl });
   return res.status(201).json({ data: store });
 });
 

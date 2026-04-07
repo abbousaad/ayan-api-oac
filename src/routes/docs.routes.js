@@ -1,18 +1,29 @@
-const path = require('path');
 const express = require('express');
-const { requireJwt, requireRole } = require('../auth/auth-middleware');
 const { openapiSpec } = require('../docs/openapi');
 const { swaggerServe, swaggerSetup } = require('../docs/swagger');
 
 const router = express.Router();
+const swaggerContentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "font-src 'self' https: data:",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "img-src 'self' data:",
+  "object-src 'none'",
+  "script-src 'self' 'unsafe-inline'",
+  "script-src-attr 'none'",
+  "style-src 'self' https: 'unsafe-inline'",
+  'upgrade-insecure-requests'
+].join(';');
 
-router.get('/docs-json', requireJwt, requireRole('superadmin'), (_req, res) => {
+router.get('/docs-json', (_req, res) => {
   res.status(200).json(openapiSpec);
 });
 
-router.get('/docs-auth.js', (_req, res) => {
-  res.type('application/javascript');
-  res.sendFile(path.join(__dirname, '../docs/swagger-auth.client.js'));
+router.use('/docs', (_req, res, next) => {
+  res.setHeader('Content-Security-Policy', swaggerContentSecurityPolicy);
+  next();
 });
 
 router.use('/docs', swaggerServe, swaggerSetup);

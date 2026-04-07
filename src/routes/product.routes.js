@@ -3,14 +3,19 @@ const { requireJwt, requireRole } = require('../auth/auth-middleware');
 const { createProductService } = require('../services/product-service');
 const productsRepository = require('../repositories/products-repository');
 const storesRepository = require('../repositories/stores-repository');
+const appSettingsRepository = require('../repositories/app-settings-repository');
+const { createImageUploadMiddleware, handleImageUpload, getUploadedImageUrl } = require('../uploads/image-upload');
 
 const router = express.Router();
 const productService = createProductService(productsRepository);
 const ALLOWED_UNITS = ['g', 'kg', 'ml', 'l', 'unit'];
+const uploadProductImage = createImageUploadMiddleware('products');
 
 router.get('/products', async (req, res) => {
   const products = await productService.getAllProducts({ storeId: req.query.storeId });
-  res.status(200).json({ data: products });
+  const currencyCode = await appSettingsRepository.getCurrencyCode();
+  const payload = products.map((product) => ({ ...product, currencyCode }));
+  res.status(200).json({ data: payload });
 });
 
 router.get('/products/:id', async (req, res) => {
@@ -21,10 +26,17 @@ router.get('/products/:id', async (req, res) => {
     });
   }
 
-  return res.status(200).json({ data: product });
+  const currencyCode = await appSettingsRepository.getCurrencyCode();
+  return res.status(200).json({ data: { ...product, currencyCode } });
 });
 
 router.post('/products', requireJwt, requireRole('superadmin'), async (req, res) => {
+  try {
+    await handleImageUpload(uploadProductImage)(req, res);
+  } catch (uploadError) {
+    return res.status(uploadError.status).json(uploadError.body);
+  }
+
   const { storeId, name, price, stock, description, unit = 'unit' } = req.body || {};
   if (!storeId || !name || price === undefined || stock === undefined) {
     return res.status(400).json({
@@ -41,8 +53,10 @@ router.post('/products', requireJwt, requireRole('superadmin'), async (req, res)
     return res.status(422).json({ error: { code: 'INVALID_UNIT', message: 'Unsupported unit' } });
   }
 
-  const product = await productService.addProduct({ storeId, name, price, stock, description, unit });
-  return res.status(201).json({ data: product });
+  const imageUrl = getUploadedImageUrl('products', req.file) || undefined;
+  const product = await productService.addProduct({ storeId, name, price, stock, description, unit, imageUrl });
+  const currencyCode = await appSettingsRepository.getCurrencyCode();
+  return res.status(201).json({ data: { ...product, currencyCode } });
 });
 
 router.patch('/products/:id', requireJwt, requireRole('superadmin'), async (req, res) => {
@@ -65,7 +79,8 @@ router.patch('/products/:id', requireJwt, requireRole('superadmin'), async (req,
     });
   }
 
-  return res.status(200).json({ data: updated });
+  const currencyCode = await appSettingsRepository.getCurrencyCode();
+  return res.status(200).json({ data: { ...updated, currencyCode } });
 });
 
 router.delete('/products/:id', requireJwt, requireRole('superadmin'), async (req, res) => {

@@ -2,12 +2,14 @@ const { randomUUID } = require('crypto');
 const { runQuery } = require('../db/pool');
 const { config } = require('../config/env');
 const { getStoresStore } = require('../data/stores');
+const { DEFAULT_STORE_IMAGE_URL } = require('../files/image-urls');
 
 const mapStoreRow = (row) => ({
   id: row.id,
   name: row.name,
   category: row.category,
-  slug: row.slug
+  slug: row.slug,
+  imageUrl: row.image_url
 });
 
 const getAllStores = async () => {
@@ -15,7 +17,7 @@ const getAllStores = async () => {
     return [...getStoresStore()];
   }
 
-  const result = await runQuery('SELECT id, name, category, slug FROM stores ORDER BY created_at ASC');
+  const result = await runQuery('SELECT id, name, category, slug, image_url FROM stores ORDER BY created_at ASC');
   return result.rows.map(mapStoreRow);
 };
 
@@ -24,24 +26,24 @@ const getStoreById = async (id) => {
     return getStoresStore().find((store) => store.id === id) || null;
   }
 
-  const result = await runQuery('SELECT id, name, category, slug FROM stores WHERE id = $1 LIMIT 1', [id]);
+  const result = await runQuery('SELECT id, name, category, slug, image_url FROM stores WHERE id = $1 LIMIT 1', [id]);
   return result.rows[0] ? mapStoreRow(result.rows[0]) : null;
 };
 
-const createStore = async ({ name, category, slug }) => {
+const createStore = async ({ name, category, slug, imageUrl = DEFAULT_STORE_IMAGE_URL }) => {
   const id = `s-${randomUUID()}`;
 
   if (config.useInMemoryPersistence) {
-    const store = { id, name, category, slug };
+    const store = { id, name, category, slug, imageUrl };
     getStoresStore().push(store);
     return store;
   }
 
   const result = await runQuery(
-    `INSERT INTO stores (id, name, category, slug)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, name, category, slug`,
-    [id, name, category, slug]
+    `INSERT INTO stores (id, name, category, slug, image_url)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, name, category, slug, image_url`,
+    [id, name, category, slug, imageUrl]
   );
 
   return mapStoreRow(result.rows[0]);
@@ -64,10 +66,10 @@ const updateStore = async (id, changes) => {
 
   const result = await runQuery(
     `UPDATE stores
-     SET name = $2, category = $3, slug = $4, updated_at = NOW()
+     SET name = $2, category = $3, slug = $4, image_url = $5, updated_at = NOW()
      WHERE id = $1
-     RETURNING id, name, category, slug`,
-    [id, next.name, next.category, next.slug]
+     RETURNING id, name, category, slug, image_url`,
+    [id, next.name, next.category, next.slug, next.imageUrl || DEFAULT_STORE_IMAGE_URL]
   );
 
   return result.rows[0] ? mapStoreRow(result.rows[0]) : null;

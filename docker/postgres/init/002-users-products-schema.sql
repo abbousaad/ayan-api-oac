@@ -16,9 +16,13 @@ CREATE TABLE IF NOT EXISTS stores (
   name TEXT NOT NULL,
   category TEXT NOT NULL CHECK (category IN ('fruits', 'vegets', 'ham', 'fish', 'ingrediant')),
   slug TEXT NOT NULL UNIQUE,
+  image_url TEXT NOT NULL DEFAULT '/files/defaults/store-default.svg',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE stores
+  ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '/files/defaults/store-default.svg';
 
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
@@ -28,9 +32,13 @@ CREATE TABLE IF NOT EXISTS products (
   price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
   stock NUMERIC(12, 3) NOT NULL CHECK (stock >= 0),
   unit TEXT NOT NULL CHECK (unit IN ('g', 'kg', 'ml', 'l', 'unit')),
+  image_url TEXT NOT NULL DEFAULT '/files/defaults/product-default.svg',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '/files/defaults/product-default.svg';
 
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products (created_at);
 CREATE INDEX IF NOT EXISTS idx_products_store_id ON products (store_id);
@@ -83,10 +91,51 @@ CREATE TABLE IF NOT EXISTS order_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public_orders (
+  id TEXT PRIMARY KEY,
+  guest_name TEXT NOT NULL,
+  guest_phone TEXT NOT NULL,
+  guest_email TEXT,
+  guest_address TEXT NOT NULL,
+  delivery_mode TEXT NOT NULL CHECK (delivery_mode IN ('instant', 'scheduled')),
+  scheduled_at TIMESTAMPTZ,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'onpreparation', 'ondelivery', 'paid')),
+  subtotal_amount NUMERIC(12, 2) NOT NULL CHECK (subtotal_amount >= 0),
+  delivery_fee NUMERIC(12, 2) NOT NULL CHECK (delivery_fee >= 0),
+  service_fee NUMERIC(12, 2) NOT NULL CHECK (service_fee >= 0),
+  tax_amount NUMERIC(12, 2) NOT NULL CHECK (tax_amount >= 0),
+  discount_amount NUMERIC(12, 2) NOT NULL CHECK (discount_amount >= 0),
+  grand_total NUMERIC(12, 2) NOT NULL CHECK (grand_total >= 0),
+  total_amount NUMERIC(12, 2) NOT NULL CHECK (total_amount >= 0),
+  coupon_id TEXT,
+  coupon_code TEXT,
+  coupon_discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (coupon_discount_amount >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_public_scheduled_delivery CHECK (
+    (delivery_mode = 'instant' AND scheduled_at IS NULL)
+    OR (delivery_mode = 'scheduled' AND scheduled_at IS NOT NULL)
+  )
+);
+
+CREATE TABLE IF NOT EXISTS public_order_items (
+  id TEXT PRIMARY KEY,
+  public_order_id TEXT NOT NULL REFERENCES public_orders(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  product_name TEXT NOT NULL,
+  unit TEXT NOT NULL CHECK (unit IN ('g', 'kg', 'ml', 'l', 'unit')),
+  quantity NUMERIC(12, 3) NOT NULL CHECK (quantity > 0),
+  unit_price NUMERIC(10, 2) NOT NULL CHECK (unit_price >= 0),
+  line_total NUMERIC(12, 2) NOT NULL CHECK (line_total >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_user_locations_user_id ON user_locations (user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders (user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items (order_id);
+CREATE INDEX IF NOT EXISTS idx_public_orders_status ON public_orders (status);
+CREATE INDEX IF NOT EXISTS idx_public_order_items_order_id ON public_order_items (public_order_id);
 
 CREATE TABLE IF NOT EXISTS order_pricing_config (
   id TEXT PRIMARY KEY,
@@ -114,9 +163,24 @@ CREATE TABLE IF NOT EXISTS coupons (
   CONSTRAINT chk_coupon_used_count CHECK (used_count >= 0)
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS coupon_id TEXT REFERENCES coupons(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS coupon_code TEXT,
   ADD COLUMN IF NOT EXISTS coupon_discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (coupon_discount_amount >= 0);
 
+ALTER TABLE public_orders
+  ADD COLUMN IF NOT EXISTS coupon_id TEXT REFERENCES coupons(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS coupon_code TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (coupon_discount_amount >= 0);
+
 CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons (code);
+
+INSERT INTO app_settings (key, value)
+VALUES ('currency_code', 'USD')
+ON CONFLICT (key) DO NOTHING;

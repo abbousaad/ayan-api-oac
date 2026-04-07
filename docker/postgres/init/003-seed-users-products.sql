@@ -5,20 +5,20 @@ VALUES
   ('u-3', 'livreur', '$2a$10$o8fu8cyrkrAz1qsasF3dguIvwhJ2Z/Z4lvCCaSDwrOVeX.bAlTyTW', 'livreur', FALSE)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO stores (id, name, category, slug)
+INSERT INTO stores (id, name, category, slug, image_url)
 VALUES
-  ('s-fruits', 'Fresh Fruits Store', 'fruits', 'fruits-store'),
-  ('s-vegets', 'Green Vegetables Store', 'vegets', 'vegets-store'),
-  ('s-ham', 'Ham Store', 'ham', 'ham-store'),
-  ('s-fish', 'Fish Store', 'fish', 'fish-store'),
-  ('s-ingrediant', 'Ingredients Store', 'ingrediant', 'ingredients-store')
+  ('s-fruits', 'Fresh Fruits Store', 'fruits', 'fruits-store', '/files/defaults/store-default.svg'),
+  ('s-vegets', 'Green Vegetables Store', 'vegets', 'vegets-store', '/files/defaults/store-default.svg'),
+  ('s-ham', 'Ham Store', 'ham', 'ham-store', '/files/defaults/store-default.svg'),
+  ('s-fish', 'Fish Store', 'fish', 'fish-store', '/files/defaults/store-default.svg'),
+  ('s-ingrediant', 'Ingredients Store', 'ingrediant', 'ingredients-store', '/files/defaults/store-default.svg')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO products (id, store_id, name, description, price, stock, unit)
+INSERT INTO products (id, store_id, name, description, price, stock, unit, image_url)
 VALUES
-  ('p-1', 's-fruits', 'Olive Oil', 'Cold pressed olive oil', 8.99, 120, 'l'),
-  ('p-2', 's-vegets', 'Potato', 'Fresh local potatoes', 1.90, 500, 'kg'),
-  ('p-3', 's-ingrediant', 'Black Pepper', 'Ground black pepper', 0.02, 1000, 'g')
+  ('p-1', 's-fruits', 'Olive Oil', 'Cold pressed olive oil', 8.99, 120, 'l', '/files/defaults/product-default.svg'),
+  ('p-2', 's-vegets', 'Potato', 'Fresh local potatoes', 1.90, 500, 'kg', '/files/defaults/product-default.svg'),
+  ('p-3', 's-ingrediant', 'Black Pepper', 'Ground black pepper', 0.02, 1000, 'g', '/files/defaults/product-default.svg')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO user_locations (id, user_id, label, address, latitude, longitude)

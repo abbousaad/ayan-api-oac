@@ -7,10 +7,12 @@ Backend API for a multi-category food market (fruits, vegetables, fish, ham, ing
 - JWT authentication with Passport (`user`, `superadmin`, `livreur`).
 - Public catalog browsing (`stores`, `products`) and protected operations.
 - Superadmin management for stores, products, coupons, and pricing config.
+- Guest checkout via `POST /api/v1/public/orders`.
 - Order flow: `pending -> onpreparation -> ondelivery -> paid`.
 - Order pricing breakdown: subtotal, delivery fee, service fee, tax, discount, coupon discount, grand total.
+- Public file serving for default and uploaded store/product images.
 - Structured logging split into `logs/security`, `logs/http`, `logs/errors`.
-- Swagger/OpenAPI docs protected by JWT.
+- Swagger/OpenAPI docs exposed at `/api/v1/docs/` and `/api/v1/docs-json`.
 - Test suites split into `unit` and `security`.
 
 ## Tech Stack
@@ -113,18 +115,100 @@ Use returned token as:
 Authorization: Bearer <TOKEN>
 ```
 
-## Swagger Docs (Superadmin + JWT)
+## Swagger Docs
 
 - OpenAPI JSON: `GET /api/v1/docs-json`
 - Swagger UI: `GET /api/v1/docs`
 
-Both endpoints require a valid Bearer token for a `superadmin` account. If password rotation is pending, access is blocked until password is changed.
+Both endpoints are currently public for easier local testing.
+
+## Guest Checkout
+
+Unauthenticated users can place orders without creating an account through:
+
+- `POST /api/v1/public/orders`
+
+Example payload:
+
+```json
+{
+  "guest": {
+    "name": "Guest Buyer",
+    "phone": "+212600000000",
+    "email": "guest@example.com",
+    "address": "15 Guest Street"
+  },
+  "deliveryMode": "instant",
+  "items": [
+    { "productId": "p-1", "quantity": 2 }
+  ],
+  "couponCode": "WELCOME10"
+}
+```
+
+This route creates a guest order in separate public-order tables and does not modify the authenticated user order flow.
+
+## Product and Store Images
+
+Stores and products include an `imageUrl` field in API responses.
+
+Images are served publicly by the API under:
+
+- `/files/defaults/...`
+- `/files/uploads/...`
+
+Examples:
+
+- `/files/defaults/store-default.svg`
+- `/files/defaults/product-default.svg`
+
+Frontend usage example:
+
+```js
+const imageSrc = `${API_BASE_URL}${product.imageUrl}`;
+```
+
+If no image is uploaded, the API returns a default image URL.
+
+## Admin Image Uploads
+
+When admins create stores or products, the request should use `multipart/form-data`.
+
+### Create Store
+
+- `POST /api/v1/stores`
+- form fields:
+  - `name`
+  - `category`
+  - `slug`
+  - `image` (optional file)
+
+### Create Product
+
+- `POST /api/v1/products`
+- form fields:
+  - `storeId`
+  - `name`
+  - `price`
+  - `stock`
+  - `description`
+  - `unit`
+  - `image` (optional file)
+
+Uploaded images are validated for:
+
+- file size
+- MIME type
+- extension
+- file signature
 
 ## Core API Areas
 
 - Auth: register, login, change password
 - Stores: public read, superadmin CRUD
 - Products: public read, superadmin CRUD
+- Public guest orders: create via `/public/orders`
+- Files: public image access via `/files/defaults/...` and `/files/uploads/...`
 - Coupons: superadmin CRUD, apply at order creation via `couponCode`
 - Buyer locations/orders: create/list
 - Order transitions:
@@ -132,6 +216,14 @@ Both endpoints require a valid Bearer token for a `superadmin` account. If passw
   - Livreur accepts delivery: `/orders/:id/accept-delivery`
   - Livreur marks paid: `/orders/:id/mark-paid`
 - Pricing config (superadmin): `/orders/pricing-config`
+
+## Pending Tasks
+
+- Add guest order tracking and retrieval endpoints
+- Re-protect Swagger/OpenAPI docs before production release
+- Expand README and Swagger examples for image upload and guest checkout flows
+- Add stricter route-specific rate limiting for public guest order creation
+- Add more unit tests for shared order-building and upload validation logic
 
 ## Secure Deployment on AWS EC2
 

@@ -148,9 +148,9 @@ const options = {
             name: { type: 'string' },
             phone: { type: 'string' },
             email: { type: 'string', nullable: true },
-            address: { type: 'string' }
+            address: { type: 'string', nullable: true }
           },
-          required: ['name', 'phone', 'address']
+          required: ['name', 'phone']
         },
         PublicOrder: {
           type: 'object',
@@ -159,7 +159,7 @@ const options = {
             guestName: { type: 'string' },
             guestPhone: { type: 'string' },
             guestEmail: { type: 'string', nullable: true },
-            guestAddress: { type: 'string' },
+            guestAddress: { type: 'string', nullable: true },
             deliveryMode: { type: 'string', enum: ['instant', 'scheduled'] },
             scheduledAt: { type: 'string', format: 'date-time', nullable: true },
             status: { type: 'string', enum: ['pending', 'onpreparation', 'ondelivery', 'paid'] },
@@ -179,7 +179,7 @@ const options = {
               items: { $ref: '#/components/schemas/OrderItem' }
             }
           },
-          required: ['id', 'guestName', 'guestPhone', 'guestAddress', 'deliveryMode', 'status', 'currencyCode']
+          required: ['id', 'guestName', 'guestPhone', 'deliveryMode', 'status', 'currencyCode']
         },
         PricingConfig: {
           type: 'object',

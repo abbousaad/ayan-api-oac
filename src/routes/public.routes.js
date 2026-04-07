@@ -50,9 +50,9 @@ router.get('/public/db-status', async (_req, res) => {
 router.post('/public/orders', async (req, res) => {
   const { guest, deliveryMode, scheduledAt = null, items, couponCode = null } = req.body || {};
 
-  if (!guest || !guest.name || !guest.phone || !guest.address) {
+  if (!guest || !guest.name || !guest.phone) {
     return res.status(400).json({
-      error: { code: 'VALIDATION_ERROR', message: 'guest name, phone and address are required' }
+      error: { code: 'VALIDATION_ERROR', message: 'guest name and phone are required' }
     });
   }
 

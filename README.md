@@ -128,6 +128,8 @@ Unauthenticated users can place orders without creating an account through:
 
 - `POST /api/v1/public/orders`
 
+Required fields: `guest.name` and `guest.phone`. Email and address are optional.
+
 Example payload:
 
 ```json

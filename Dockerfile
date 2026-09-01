@@ -14,10 +14,10 @@ RUN addgroup -S nodegroup && adduser -S nodeuser -G nodegroup
 RUN mkdir -p /app/logs/http /app/logs/errors /app/logs/security && chown -R nodeuser:nodegroup /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY src ./src
-COPY storage ./storage
-COPY package.json ./package.json
-COPY env.example ./env.example
+COPY --chown=nodeuser:nodegroup src ./src
+COPY --chown=nodeuser:nodegroup storage ./storage
+COPY --chown=nodeuser:nodegroup package.json ./package.json
+COPY --chown=nodeuser:nodegroup env.example ./env.example
 
 USER nodeuser
 EXPOSE 3000

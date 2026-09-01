@@ -4,12 +4,13 @@ const { createProductService } = require('../services/product-service');
 const productsRepository = require('../repositories/products-repository');
 const storesRepository = require('../repositories/stores-repository');
 const appSettingsRepository = require('../repositories/app-settings-repository');
-const { createImageUploadMiddleware, handleImageUpload, getUploadedImageUrl } = require('../uploads/image-upload');
+const { createMultiImageUploadMiddleware, handleImageUpload, getUploadedImageUrls } = require('../uploads/image-upload');
 
 const router = express.Router();
 const productService = createProductService(productsRepository);
 const ALLOWED_UNITS = ['g', 'kg', 'ml', 'l', 'unit'];
-const uploadProductImage = createImageUploadMiddleware('products');
+const MAX_PRODUCT_IMAGES = 6;
+const uploadProductImages = createMultiImageUploadMiddleware('products', MAX_PRODUCT_IMAGES);
 
 router.get('/products', async (req, res) => {
   const products = await productService.getAllProducts({ storeId: req.query.storeId });
@@ -32,15 +33,27 @@ router.get('/products/:id', async (req, res) => {
 
 router.post('/products', requireJwt, requireRole('superadmin'), async (req, res) => {
   try {
-    await handleImageUpload(uploadProductImage)(req, res);
+    await handleImageUpload(uploadProductImages)(req, res);
   } catch (uploadError) {
     return res.status(uploadError.status).json(uploadError.body);
   }
 
-  const { storeId, name, price, stock, description, unit = 'unit' } = req.body || {};
-  if (!storeId || !name || price === undefined || stock === undefined) {
+  const {
+    storeId,
+    nameEn,
+    nameFr,
+    nameAr,
+    price,
+    stock,
+    descriptionEn,
+    descriptionFr,
+    descriptionAr,
+    unit = 'unit'
+  } = req.body || {};
+
+  if (!storeId || !nameEn || price === undefined || stock === undefined) {
     return res.status(400).json({
-      error: { code: 'VALIDATION_ERROR', message: 'storeId, name, price and stock are required' }
+      error: { code: 'VALIDATION_ERROR', message: 'storeId, nameEn, price and stock are required' }
     });
   }
 
@@ -53,13 +66,31 @@ router.post('/products', requireJwt, requireRole('superadmin'), async (req, res)
     return res.status(422).json({ error: { code: 'INVALID_UNIT', message: 'Unsupported unit' } });
   }
 
-  const imageUrl = getUploadedImageUrl('products', req.file) || undefined;
-  const product = await productService.addProduct({ storeId, name, price, stock, description, unit, imageUrl });
+  const images = getUploadedImageUrls('products', req.files);
+  const product = await productService.addProduct({
+    storeId,
+    nameEn,
+    nameFr,
+    nameAr,
+    price,
+    stock,
+    descriptionEn,
+    descriptionFr,
+    descriptionAr,
+    unit,
+    images
+  });
   const currencyCode = await appSettingsRepository.getCurrencyCode();
   return res.status(201).json({ data: { ...product, currencyCode } });
 });
 
 router.patch('/products/:id', requireJwt, requireRole('superadmin'), async (req, res) => {
+  try {
+    await handleImageUpload(uploadProductImages)(req, res);
+  } catch (uploadError) {
+    return res.status(uploadError.status).json(uploadError.body);
+  }
+
   const changes = req.body || {};
   if (changes.unit && !ALLOWED_UNITS.includes(changes.unit)) {
     return res.status(422).json({ error: { code: 'INVALID_UNIT', message: 'Unsupported unit' } });
@@ -70,6 +101,10 @@ router.patch('/products/:id', requireJwt, requireRole('superadmin'), async (req,
     if (!store) {
       return res.status(404).json({ error: { code: 'STORE_NOT_FOUND', message: 'Store not found' } });
     }
+  }
+
+  if (req.files && req.files.length > 0) {
+    changes.images = getUploadedImageUrls('products', req.files);
   }
 
   const updated = await productService.editProduct(req.params.id, changes);

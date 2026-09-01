@@ -13,6 +13,7 @@ const config = {
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
   jwtIssuer: process.env.JWT_ISSUER || 'express-api-foundation',
   jwtAudience: process.env.JWT_AUDIENCE || 'express-api-clients',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
   databaseUrl: process.env.DATABASE_URL || 'postgresql://appuser:apppassword@localhost:5432/appdb',
   dbConnectRetries: asNumber(process.env.DB_CONNECT_RETRIES, 10),
   dbConnectRetryDelayMs: asNumber(process.env.DB_CONNECT_RETRY_DELAY_MS, 2000),

@@ -1,5 +1,5 @@
 # Express Market API
-
+cS0ab3jBhJUjFTbHb2pg
 Backend API for a multi-category food market (fruits, vegetables, fish, ham, ingredients), with JWT auth, role-based access, order lifecycle, pricing configuration, and coupons.
 
 ## Features
@@ -93,7 +93,7 @@ npm run lint
 
 ## Authentication Quick Start
 
-Seed users:
+Default credentials:
 
 - `demo / demo1234` (`user`)
 - `superadmin / superadmin1234` (`superadmin`, password change required before privileged access)
@@ -150,9 +150,24 @@ Example payload:
 
 This route creates a guest order in separate public-order tables and does not modify the authenticated user order flow.
 
-## Product and Store Images
+## Store and Product Localization (English / French / Arabic)
 
-Stores and products include an `imageUrl` field in API responses.
+Stores and products both carry a `name` and `description` localized into English, French, and Arabic. API responses return both as objects keyed by locale:
+
+```json
+{
+  "name": { "en": "Olive Oil", "fr": "Huile d'olive", "ar": "زيت الزيتون" },
+  "description": { "en": "Cold pressed olive oil", "fr": "Huile d'olive pressée à froid", "ar": "زيت زيتون معصور على البارد" }
+}
+```
+
+English (`nameEn`) is required; French and Arabic are optional. Because creating/editing a store or product uses `multipart/form-data` (to support image uploads), the locale fields are submitted as flat form fields rather than a nested object: `nameEn`, `nameFr`, `nameAr`, `descriptionEn`, `descriptionFr`, `descriptionAr`.
+
+Store `category` is a free-text field the admin can set to anything (no fixed list, no validation), and currency is a single global, non-localized setting (see [Core API Areas](#core-api-areas)) — neither carries locale-specific translations.
+
+## Store and Product Images
+
+Both stores and products include `images` (an ordered array of URLs) and `imageUrl` (the first image in `images`, i.e. the cover photo) in API responses.
 
 Images are served publicly by the API under:
 
@@ -168,6 +183,7 @@ Frontend usage example:
 
 ```js
 const imageSrc = `${API_BASE_URL}${product.imageUrl}`;
+const gallery = product.images.map((path) => `${API_BASE_URL}${path}`);
 ```
 
 If no image is uploaded, the API returns a default image URL.
@@ -180,22 +196,25 @@ When admins create stores or products, the request should use `multipart/form-da
 
 - `POST /api/v1/stores`
 - form fields:
-  - `name`
-  - `category`
+  - `nameEn` (required), `nameFr`, `nameAr`
+  - `category` (required, free text — any value)
   - `slug`
-  - `image` (optional file)
+  - `descriptionEn`, `descriptionFr`, `descriptionAr`
+  - `images` (optional, up to 6 files, field repeated per file)
 
 ### Create Product
 
 - `POST /api/v1/products`
 - form fields:
   - `storeId`
-  - `name`
+  - `nameEn` (required), `nameFr`, `nameAr`
   - `price`
   - `stock`
-  - `description`
+  - `descriptionEn`, `descriptionFr`, `descriptionAr`
   - `unit`
-  - `image` (optional file)
+  - `images` (optional, up to 6 files, field repeated per file)
+
+`PATCH /api/v1/stores/:id` and `PATCH /api/v1/products/:id` accept the same fields (all optional) as either `application/json` or `multipart/form-data`. If `images` files are included, they replace the entire image set.
 
 Uploaded images are validated for:
 

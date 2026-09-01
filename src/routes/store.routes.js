@@ -3,11 +3,11 @@ const { requireJwt, requireRole } = require('../auth/auth-middleware');
 const storesRepository = require('../repositories/stores-repository');
 const productsRepository = require('../repositories/products-repository');
 const appSettingsRepository = require('../repositories/app-settings-repository');
-const { createImageUploadMiddleware, handleImageUpload, getUploadedImageUrl } = require('../uploads/image-upload');
+const { createMultiImageUploadMiddleware, handleImageUpload, getUploadedImageUrls } = require('../uploads/image-upload');
 
 const router = express.Router();
-const ALLOWED_CATEGORIES = ['fruits', 'vegets', 'ham', 'fish', 'ingrediant'];
-const uploadStoreImage = createImageUploadMiddleware('stores');
+const MAX_STORE_IMAGES = 6;
+const uploadStoreImages = createMultiImageUploadMiddleware('stores', MAX_STORE_IMAGES);
 
 router.get('/stores', async (_req, res) => {
   const stores = await storesRepository.getAllStores();
@@ -37,35 +37,44 @@ router.get('/stores/:id/products', async (req, res) => {
 
 router.post('/stores', requireJwt, requireRole('superadmin'), async (req, res) => {
   try {
-    await handleImageUpload(uploadStoreImage)(req, res);
+    await handleImageUpload(uploadStoreImages)(req, res);
   } catch (uploadError) {
     return res.status(uploadError.status).json(uploadError.body);
   }
 
-  const { name, category, slug } = req.body || {};
-  if (!name || !category || !slug) {
+  const { nameEn, nameFr, nameAr, category, slug, descriptionEn, descriptionFr, descriptionAr } = req.body || {};
+  if (!nameEn || !category || !slug) {
     return res.status(400).json({
-      error: { code: 'VALIDATION_ERROR', message: 'name, category and slug are required' }
+      error: { code: 'VALIDATION_ERROR', message: 'nameEn, category and slug are required' }
     });
   }
 
-  if (!ALLOWED_CATEGORIES.includes(category)) {
-    return res.status(422).json({
-      error: { code: 'INVALID_CATEGORY', message: 'Unsupported category' }
-    });
-  }
-
-  const imageUrl = getUploadedImageUrl('stores', req.file) || undefined;
-  const store = await storesRepository.createStore({ name, category, slug, imageUrl });
+  const images = getUploadedImageUrls('stores', req.files);
+  const store = await storesRepository.createStore({
+    nameEn,
+    nameFr,
+    nameAr,
+    category,
+    slug,
+    descriptionEn,
+    descriptionFr,
+    descriptionAr,
+    images
+  });
   return res.status(201).json({ data: store });
 });
 
 router.patch('/stores/:id', requireJwt, requireRole('superadmin'), async (req, res) => {
+  try {
+    await handleImageUpload(uploadStoreImages)(req, res);
+  } catch (uploadError) {
+    return res.status(uploadError.status).json(uploadError.body);
+  }
+
   const changes = req.body || {};
-  if (changes.category && !ALLOWED_CATEGORIES.includes(changes.category)) {
-    return res.status(422).json({
-      error: { code: 'INVALID_CATEGORY', message: 'Unsupported category' }
-    });
+
+  if (req.files && req.files.length > 0) {
+    changes.images = getUploadedImageUrls('stores', req.files);
   }
 
   const updated = await storesRepository.updateStore(req.params.id, changes);

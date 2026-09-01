@@ -19,7 +19,7 @@ const createOrderBuilder = ({ productsRepository, pricingConfigRepository, coupo
       const quantity = Number(item.quantity);
       resolvedItems.push({
         productId: product.id,
-        productName: product.name,
+        productName: product.name.en,
         unit: product.unit,
         quantity,
         unitPrice: product.price,

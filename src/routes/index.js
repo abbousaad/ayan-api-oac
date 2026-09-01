@@ -6,6 +6,7 @@ const { storeRouter } = require('./store.routes');
 const { orderRouter } = require('./order.routes');
 const { couponRouter } = require('./coupon.routes');
 const { settingsRouter } = require('./settings.routes');
+const { translationRouter } = require('./translation.routes');
 
 const apiRouter = express.Router();
 
@@ -16,5 +17,6 @@ apiRouter.use(storeRouter);
 apiRouter.use(orderRouter);
 apiRouter.use(couponRouter);
 apiRouter.use(settingsRouter);
+apiRouter.use(translationRouter);
 
 module.exports = { apiRouter };

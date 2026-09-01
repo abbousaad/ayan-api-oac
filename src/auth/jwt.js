@@ -8,7 +8,7 @@ const buildTokenPayload = (user) => ({
 });
 
 const signAccessToken = (user) => jwt.sign(buildTokenPayload(user), config.jwtSecret, {
-  expiresIn: '15m',
+  expiresIn: config.jwtExpiresIn,
   issuer: config.jwtIssuer,
   audience: config.jwtAudience,
   algorithm: 'HS256'

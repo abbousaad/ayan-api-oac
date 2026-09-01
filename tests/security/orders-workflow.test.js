@@ -225,7 +225,7 @@ describe('orders workflow security and buyer flow', () => {
       .set('Authorization', `Bearer ${superadminToken}`)
       .send({
         storeId: 's-fruits',
-        name: 'Egg Box Unit Product',
+        nameEn: 'Egg Box Unit Product',
         price: 5.25,
         stock: 40,
         unit: 'unit'

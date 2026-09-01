@@ -106,6 +106,20 @@ const validateStoredFileSignature = async (file) => {
   throw new Error('Uploaded image content does not match a supported file format');
 };
 
+const validateStoredFilesSignatures = async (files) => {
+  if (!files || files.length === 0) {
+    return;
+  }
+
+  for (const file of files) {
+    const fileBuffer = await fs.promises.readFile(file.path);
+    if (!hasValidImageSignature({ mimetype: file.mimetype, buffer: fileBuffer })) {
+      await Promise.all(files.map((otherFile) => fs.promises.unlink(otherFile.path).catch(() => {})));
+      throw new Error('Uploaded image content does not match a supported file format');
+    }
+  }
+};
+
 const createImageUploadMiddleware = (entityType) => multer({
   storage: createStorage(entityType),
   fileFilter: imageFileFilter,
@@ -117,11 +131,23 @@ const createImageUploadMiddleware = (entityType) => multer({
   }
 }).single('image');
 
+const createMultiImageUploadMiddleware = (entityType, maxCount) => multer({
+  storage: createStorage(entityType),
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: MAX_IMAGE_SIZE_BYTES,
+    files: maxCount,
+    fields: 10,
+    parts: maxCount + 10
+  }
+}).array('images', maxCount);
+
 const handleImageUpload = (uploadMiddleware) => (req, res) => new Promise((resolve, reject) => {
   uploadMiddleware(req, res, async (error) => {
     if (!error) {
       try {
         await validateStoredFileSignature(req.file);
+        await validateStoredFilesSignatures(req.files);
         resolve();
       } catch (validationError) {
         reject({ status: 422, body: { error: { code: 'INVALID_IMAGE', message: validationError.message } } });
@@ -140,8 +166,12 @@ const handleImageUpload = (uploadMiddleware) => (req, res) => new Promise((resol
 
 const getUploadedImageUrl = (entityType, file) => (file ? getEntityImageUrl({ entityType, filename: file.filename }) : null);
 
+const getUploadedImageUrls = (entityType, files) => (files || []).map((file) => getEntityImageUrl({ entityType, filename: file.filename }));
+
 module.exports = {
   createImageUploadMiddleware,
+  createMultiImageUploadMiddleware,
   handleImageUpload,
-  getUploadedImageUrl
+  getUploadedImageUrl,
+  getUploadedImageUrls
 };

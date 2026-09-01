@@ -42,7 +42,7 @@ describe('authentication security', () => {
     const createProduct = await request(app)
       .post('/api/v1/products')
       .set('Authorization', `Bearer ${login.body.data.token}`)
-      .send({ storeId: 's-fruits', name: 'Privilege Escalation Product', price: 10, stock: 1, unit: 'unit' });
+      .send({ storeId: 's-fruits', nameEn: 'Privilege Escalation Product', price: 10, stock: 1, unit: 'unit' });
 
     expect(createProduct.status).toBe(403);
     spy.mockRestore();
@@ -95,7 +95,7 @@ describe('authentication security', () => {
     const blocked = await request(app)
       .post('/api/v1/products')
       .set('Authorization', `Bearer ${superadmin.token}`)
-      .send({ storeId: 's-fruits', name: 'Blocked Product', price: 10, stock: 1, unit: 'unit' });
+      .send({ storeId: 's-fruits', nameEn: 'Blocked Product', price: 10, stock: 1, unit: 'unit' });
 
     expect(blocked.status).toBe(403);
     expect(blocked.body.error.code).toBe('PASSWORD_CHANGE_REQUIRED');
@@ -117,7 +117,7 @@ describe('authentication security', () => {
     const allowed = await request(app)
       .post('/api/v1/products')
       .set('Authorization', `Bearer ${relogin.body.data.token}`)
-      .send({ storeId: 's-fruits', name: 'Allowed Product', price: 10, stock: 1, unit: 'unit' });
+      .send({ storeId: 's-fruits', nameEn: 'Allowed Product', price: 10, stock: 1, unit: 'unit' });
 
     expect(allowed.status).toBe(201);
   });

@@ -48,12 +48,14 @@ const options = {
           type: 'object',
           properties: {
             id: { type: 'string' },
-            name: { type: 'string' },
-            category: { type: 'string', enum: ['fruits', 'vegets', 'ham', 'fish', 'ingrediant'] },
+            name: { $ref: '#/components/schemas/LocalizedText' },
+            description: { $ref: '#/components/schemas/LocalizedText' },
+            category: { type: 'string', description: 'Free-text category (any value the admin chooses)' },
             slug: { type: 'string' },
-            imageUrl: { type: 'string' }
+            images: { type: 'array', items: { type: 'string' }, description: 'Ordered list of image URLs' },
+            imageUrl: { type: 'string', description: 'Cover image URL (first entry in images, or the default)' }
           },
-          required: ['id', 'name', 'category', 'slug', 'imageUrl']
+          required: ['id', 'name', 'category', 'slug', 'images', 'imageUrl']
         },
         CurrencySetting: {
           type: 'object',
@@ -62,20 +64,65 @@ const options = {
           },
           required: ['currencyCode']
         },
+        UITheme: {
+          type: 'object',
+          properties: {
+            primaryColor: { type: 'string', description: 'Main background color (hex format)' },
+            textColor: { type: 'string', description: 'Main text color (hex format)' },
+            secondaryColor: { type: 'string', description: 'Secondary color for buttons and hover (hex format)' },
+            subtitle1Color: { type: 'string', description: 'Subtitle 1 color (hex format)' },
+            subtitle2Color: { type: 'string', description: 'Subtitle 2 color (hex format)' },
+            logoTitleColor: { type: 'string', description: 'Logo title color (hex format)' },
+            logoSubtitleColor: { type: 'string', description: 'Logo subtitle color (hex format)' },
+            mainButtonBgColor: { type: 'string', description: 'Main button background color (hex format)' },
+            secButtonBgColor: { type: 'string', description: 'Secondary button background color (hex format)' },
+            homeSubtitleTextColor: { type: 'string', description: 'Home subtitle text color (hex format)' },
+            homeTitleColor: { type: 'string', description: 'Home title color (hex format)' },
+            accentColor: { type: 'string', description: 'Accent color (hex format)' },
+            cardBgColor: { type: 'string', description: 'Card background color (hex format)' },
+            checkoutButtonBgColor: { type: 'string', description: 'Checkout button background color (hex format)' },
+            cartTitleColor: { type: 'string', description: 'Cart title color (hex format)' },
+            sectionTitleColor: { type: 'string', description: 'Section title color (hex format)' },
+            bodyTextColor: { type: 'string', description: 'Body text color (hex format)' },
+            priceColor: { type: 'string', description: 'Price color (hex format)' },
+            pageBgColor: { type: 'string', description: 'Page background color (hex format)' },
+            navBgColor: { type: 'string', description: 'Navigation background color (hex format)' }
+          },
+          required: ['primaryColor', 'textColor', 'secondaryColor', 'subtitle1Color', 'subtitle2Color', 'logoTitleColor', 'logoSubtitleColor', 'mainButtonBgColor', 'secButtonBgColor', 'homeSubtitleTextColor', 'homeTitleColor', 'accentColor', 'cardBgColor', 'checkoutButtonBgColor', 'cartTitleColor', 'sectionTitleColor', 'bodyTextColor', 'priceColor', 'pageBgColor', 'navBgColor']
+        },
+        TranslationConfig: {
+          type: 'object',
+          properties: {
+            defaultLocale: { type: 'string', enum: ['en', 'fr', 'ar'], description: 'Default locale code' },
+            activeLocales: { type: 'array', items: { type: 'string', enum: ['en', 'fr', 'ar'] }, description: 'Active locale codes' },
+            translations: { type: 'object', description: 'Translations by locale, each containing key-value string pairs' }
+          },
+          required: ['defaultLocale', 'activeLocales', 'translations']
+        },
+        LocalizedText: {
+          type: 'object',
+          properties: {
+            en: { type: 'string' },
+            fr: { type: 'string', nullable: true },
+            ar: { type: 'string', nullable: true }
+          },
+          required: ['en']
+        },
         Product: {
           type: 'object',
           properties: {
             id: { type: 'string' },
             storeId: { type: 'string' },
-            name: { type: 'string' },
+            name: { $ref: '#/components/schemas/LocalizedText' },
             price: { type: 'number' },
             currencyCode: { type: 'string' },
             stock: { type: 'number' },
-            description: { type: 'string', nullable: true },
+            description: { $ref: '#/components/schemas/LocalizedText' },
             unit: { type: 'string', enum: ['g', 'kg', 'ml', 'l', 'unit'] },
-            imageUrl: { type: 'string' }
+            images: { type: 'array', items: { type: 'string' }, description: 'Ordered list of image URLs' },
+            imageUrl: { type: 'string', description: 'Cover image URL (first entry in images, or the default)' }
           },
-          required: ['id', 'storeId', 'name', 'price', 'currencyCode', 'stock', 'unit', 'imageUrl']
+          required: ['id', 'storeId', 'name', 'price', 'currencyCode', 'stock', 'unit', 'images', 'imageUrl']
         },
         Coupon: {
           type: 'object',
@@ -190,6 +237,15 @@ const options = {
             discountRate: { type: 'number' }
           },
           required: ['deliveryFee', 'serviceFeeRate', 'taxRate', 'discountRate']
+        },
+        BrandingSetting: {
+          type: 'object',
+          properties: {
+            logoUrl: { type: 'string', nullable: true, description: 'URL to the uploaded logo image' },
+            title: { type: 'string', description: 'Branding title (e.g., "Ayan Market")' },
+            subtitle: { type: 'string', description: 'Branding subtitle (e.g., "Fresh essentials")' }
+          },
+          required: ['title', 'subtitle']
         }
       }
     },
@@ -235,6 +291,123 @@ const options = {
             401: { description: 'Unauthorized' },
             403: { description: 'Forbidden' },
             422: { description: 'Validation error' }
+          }
+        }
+      },
+      '/settings/theme': {
+        get: {
+          summary: 'Get UI theme configuration (public)',
+          responses: {
+            200: { description: 'Theme configuration', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/UITheme' } } } } } }
+          }
+        },
+        patch: {
+          summary: 'Update UI theme configuration (superadmin only)',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    primaryColor: { type: 'string', description: 'Main background color in hex format (#RRGGBB)' },
+                    textColor: { type: 'string', description: 'Main text color in hex format (#RRGGBB)' },
+                    secondaryColor: { type: 'string', description: 'Secondary color for buttons and hover in hex format (#RRGGBB)' },
+                    subtitle1Color: { type: 'string', description: 'Subtitle 1 color in hex format (#RRGGBB)' },
+                    subtitle2Color: { type: 'string', description: 'Subtitle 2 color in hex format (#RRGGBB)' },
+                    logoTitleColor: { type: 'string', description: 'Logo title color in hex format (#RRGGBB)' },
+                    logoSubtitleColor: { type: 'string', description: 'Logo subtitle color in hex format (#RRGGBB)' },
+                    mainButtonBgColor: { type: 'string', description: 'Main button background color in hex format (#RRGGBB)' },
+                    secButtonBgColor: { type: 'string', description: 'Secondary button background color in hex format (#RRGGBB)' },
+                    homeSubtitleTextColor: { type: 'string', description: 'Home subtitle text color in hex format (#RRGGBB)' },
+                    homeTitleColor: { type: 'string', description: 'Home title color in hex format (#RRGGBB)' },
+                    accentColor: { type: 'string', description: 'Accent color in hex format (#RRGGBB)' },
+                    cardBgColor: { type: 'string', description: 'Card background color in hex format (#RRGGBB)' },
+                    checkoutButtonBgColor: { type: 'string', description: 'Checkout button background color in hex format (#RRGGBB)' },
+                    cartTitleColor: { type: 'string', description: 'Cart title color in hex format (#RRGGBB)' },
+                    sectionTitleColor: { type: 'string', description: 'Section title color in hex format (#RRGGBB)' },
+                    bodyTextColor: { type: 'string', description: 'Body text color in hex format (#RRGGBB)' },
+                    priceColor: { type: 'string', description: 'Price color in hex format (#RRGGBB)' },
+                    pageBgColor: { type: 'string', description: 'Page background color in hex format (#RRGGBB)' },
+                    navBgColor: { type: 'string', description: 'Navigation background color in hex format (#RRGGBB)' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: { description: 'Theme configuration updated', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/UITheme' } } } } } },
+            401: { description: 'Unauthorized' },
+            403: { description: 'Forbidden' },
+            422: { description: 'Validation error' }
+          }
+        }
+      },
+      '/settings/translations': {
+        get: {
+          summary: 'Get translation configuration (public)',
+          responses: {
+            200: { description: 'Translation configuration', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/TranslationConfig' } } } } } }
+          }
+        },
+        patch: {
+          summary: 'Update translation configuration (superadmin only)',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    defaultLocale: { type: 'string', enum: ['en', 'fr', 'ar'], description: 'Default locale code' },
+                    activeLocales: { type: 'array', items: { type: 'string', enum: ['en', 'fr', 'ar'] }, description: 'Active locale codes' },
+                    translations: { type: 'object', description: 'Partial translations to merge into existing state' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: { description: 'Translation configuration updated', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/TranslationConfig' } } } } } },
+            401: { description: 'Unauthorized' },
+            403: { description: 'Forbidden' },
+            422: { description: 'Validation error' }
+          }
+        }
+      },
+      '/settings/branding': {
+        get: {
+          summary: 'Get branding configuration (public)',
+          responses: {
+            200: { description: 'Branding configuration', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/BrandingSetting' } } } } } }
+          }
+        },
+        patch: {
+          summary: 'Update branding configuration with logo upload (superadmin only)',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string', description: 'Branding title (e.g., "Ayan Market")' },
+                    subtitle: { type: 'string', description: 'Branding subtitle (e.g., "Fresh essentials")' },
+                    image: { type: 'string', format: 'binary', description: 'Logo image file (JPEG, PNG, or WEBP)' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: { description: 'Branding configuration updated', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/BrandingSetting' } } } } } },
+            400: { description: 'Upload error' },
+            401: { description: 'Unauthorized' },
+            403: { description: 'Forbidden' },
+            422: { description: 'Validation error or invalid image' }
           }
         }
       },
@@ -464,15 +637,23 @@ const options = {
               'multipart/form-data': {
                 schema: {
                   type: 'object',
-                  required: ['storeId', 'name', 'price', 'stock'],
+                  required: ['storeId', 'nameEn', 'price', 'stock'],
                   properties: {
                     storeId: { type: 'string' },
-                    name: { type: 'string' },
+                    nameEn: { type: 'string', description: 'Product name (English)' },
+                    nameFr: { type: 'string', description: 'Product name (French)' },
+                    nameAr: { type: 'string', description: 'Product name (Arabic)' },
                     price: { type: 'number' },
                     stock: { type: 'number' },
-                    description: { type: 'string' },
+                    descriptionEn: { type: 'string', description: 'Product description (English)' },
+                    descriptionFr: { type: 'string', description: 'Product description (French)' },
+                    descriptionAr: { type: 'string', description: 'Product description (Arabic)' },
                     unit: { type: 'string', enum: ['g', 'kg', 'ml', 'l', 'unit'], default: 'unit' },
-                    image: { type: 'string', format: 'binary' }
+                    images: {
+                      type: 'array',
+                      items: { type: 'string', format: 'binary' },
+                      description: 'Up to 6 product images'
+                    }
                   }
                 }
               }
@@ -523,11 +704,37 @@ const options = {
                   type: 'object',
                   properties: {
                     storeId: { type: 'string' },
-                    name: { type: 'string' },
+                    nameEn: { type: 'string' },
+                    nameFr: { type: 'string' },
+                    nameAr: { type: 'string' },
                     price: { type: 'number' },
                     stock: { type: 'number' },
-                    description: { type: 'string' },
+                    descriptionEn: { type: 'string' },
+                    descriptionFr: { type: 'string' },
+                    descriptionAr: { type: 'string' },
                     unit: { type: 'string', enum: ['g', 'kg', 'ml', 'l', 'unit'] }
+                  }
+                }
+              },
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    storeId: { type: 'string' },
+                    nameEn: { type: 'string' },
+                    nameFr: { type: 'string' },
+                    nameAr: { type: 'string' },
+                    price: { type: 'number' },
+                    stock: { type: 'number' },
+                    descriptionEn: { type: 'string' },
+                    descriptionFr: { type: 'string' },
+                    descriptionAr: { type: 'string' },
+                    unit: { type: 'string', enum: ['g', 'kg', 'ml', 'l', 'unit'] },
+                    images: {
+                      type: 'array',
+                      items: { type: 'string', format: 'binary' },
+                      description: 'If provided, replaces all existing product images (up to 6)'
+                    }
                   }
                 }
               }
@@ -576,12 +783,21 @@ const options = {
               'multipart/form-data': {
                 schema: {
                   type: 'object',
-                  required: ['name', 'category', 'slug'],
+                  required: ['nameEn', 'category', 'slug'],
                   properties: {
-                    name: { type: 'string' },
-                    category: { type: 'string', enum: ['fruits', 'vegets', 'ham', 'fish', 'ingrediant'] },
+                    nameEn: { type: 'string', description: 'Store name (English)' },
+                    nameFr: { type: 'string', description: 'Store name (French)' },
+                    nameAr: { type: 'string', description: 'Store name (Arabic)' },
+                    descriptionEn: { type: 'string', description: 'Store description (English)' },
+                    descriptionFr: { type: 'string', description: 'Store description (French)' },
+                    descriptionAr: { type: 'string', description: 'Store description (Arabic)' },
+                    category: { type: 'string', description: 'Free-text category (any value the admin chooses)' },
                     slug: { type: 'string' },
-                    image: { type: 'string', format: 'binary' }
+                    images: {
+                      type: 'array',
+                      items: { type: 'string', format: 'binary' },
+                      description: 'Up to 6 store images'
+                    }
                   }
                 }
               }
@@ -591,8 +807,7 @@ const options = {
             201: { description: 'Store created' },
             400: { description: 'Validation error' },
             401: { description: 'Unauthorized' },
-            403: { description: 'Forbidden' },
-            422: { description: 'Invalid category' }
+            403: { description: 'Forbidden' }
           }
         }
       },
@@ -630,9 +845,34 @@ const options = {
                 schema: {
                   type: 'object',
                   properties: {
-                    name: { type: 'string' },
-                    category: { type: 'string', enum: ['fruits', 'vegets', 'ham', 'fish', 'ingrediant'] },
+                    nameEn: { type: 'string' },
+                    nameFr: { type: 'string' },
+                    nameAr: { type: 'string' },
+                    descriptionEn: { type: 'string' },
+                    descriptionFr: { type: 'string' },
+                    descriptionAr: { type: 'string' },
+                    category: { type: 'string', description: 'Free-text category (any value the admin chooses)' },
                     slug: { type: 'string' }
+                  }
+                }
+              },
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    nameEn: { type: 'string' },
+                    nameFr: { type: 'string' },
+                    nameAr: { type: 'string' },
+                    descriptionEn: { type: 'string' },
+                    descriptionFr: { type: 'string' },
+                    descriptionAr: { type: 'string' },
+                    category: { type: 'string', description: 'Free-text category (any value the admin chooses)' },
+                    slug: { type: 'string' },
+                    images: {
+                      type: 'array',
+                      items: { type: 'string', format: 'binary' },
+                      description: 'If provided, replaces all existing store images (up to 6)'
+                    }
                   }
                 }
               }
@@ -642,8 +882,7 @@ const options = {
             200: { description: 'Store updated' },
             401: { description: 'Unauthorized' },
             403: { description: 'Forbidden' },
-            404: { description: 'Not found' },
-            422: { description: 'Invalid category' }
+            404: { description: 'Not found' }
           }
         },
         delete: {
